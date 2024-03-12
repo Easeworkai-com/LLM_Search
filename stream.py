@@ -13,8 +13,6 @@ load_dotenv()
 
 api_key = os.environ.get('OPENAI_API_KEY')
 openai.api_key = api_key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL")
 auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
