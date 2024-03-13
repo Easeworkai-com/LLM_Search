@@ -25,7 +25,7 @@ client = weaviate.Client(
 )
 
 def query_weaviate(ask):
-    vector_store = WeaviateVectorStore(weaviate_client=client, index_name="NABH")
+    vector_store = WeaviateVectorStore(weaviate_client=client, index_name="NABSH")
     loaded_index = VectorStoreIndex.from_vector_store(vector_store)
     query_engine = loaded_index.as_query_engine()
     response = query_engine.query(ask)
@@ -38,7 +38,6 @@ def contract_analysis_w_fact_checking(text):
 
     # Perform contract analysis using query_weaviate (assuming it's a function)
     quert_instance = query_weaviate(text)
-
     llmresponse = quert_instance.response
     page = quert_instance.source_nodes[0].node.metadata.get('page_label', '')
     file_name = quert_instance.source_nodes[0].node.metadata.get('file_name', '')
