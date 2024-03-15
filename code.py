@@ -24,26 +24,38 @@ WEAVIATE_URL = os.getenv("WEAVIATE_URL")
 auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
 
 client = weaviate.Client(
-  url=WEAVIATE_URL,
-  auth_client_secret=auth_config
+    url=WEAVIATE_URL,
+    auth_client_secret=auth_config
 )
-
 
 
 def search_and_query():
     blogs = SimpleDirectoryReader("./Data").load_data()
     text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=10)
     Settings.text_splitter = text_splitter
-    vector_store = WeaviateVectorStore(weaviate_client=client, index_name="NABSH")
+    vector_store = WeaviateVectorStore(
+        weaviate_client=client, index_name="NABSH")
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    VectorStoreIndex.from_documents(blogs, storage_context=storage_context, transformations=[text_splitter])
+    VectorStoreIndex.from_documents(
+        blogs, storage_context=storage_context, transformations=[text_splitter])
     return "Done Embeddings"
+
 
 def Quert(ask):
     vector_store = WeaviateVectorStore(weaviate_client=client, index_name="NABSH")
     loaded_index = VectorStoreIndex.from_vector_store(vector_store)
-    query_engine = loaded_index.as_query_engine()
-    response = query_engine.query(ask)
+    query_engine = loaded_index.as_query_engine(include_text=True,
+                                                response_mode="tree_summarize",
+                                                embedding_mode="hybrid",
+                                                similarity_top_k=5,)
+    message_template = f"""<|system|>Please check if the following pieces of context has any mention of the keywords provided in the Question and please try to give correct answer</s>
+    <|user|>
+    Question: {ask}
+    Helpful Answer:
+    </s>"""
+    print("Done 2")
+    response = query_engine.query(message_template)
+    print("Done 4")
     return response
 
 
@@ -55,7 +67,7 @@ def contract_analysis_w_fact_checking(text):
     print("done 1")
     # Perform contract analysis using Quert (assuming Quert is a class or function)
     quert_instance = Quert(text)
-    
+
     # Extract relevant information from the Quert response
     if quert_instance.response:
         contract_results = [{
@@ -71,14 +83,14 @@ def contract_analysis_w_fact_checking(text):
         }]
     else:
         contract_results = []
-    
+
     # Return a standardized response
     return {"status": "success", "message": "Contract analysis successful", "model_response": contract_results}
 
 
 @app.post("/embedd")
 async def predict():
-    try: 
+    try:
         dor = search_and_query()
         return {"user_content": dor}
     except Exception as e:
@@ -89,7 +101,8 @@ async def predict():
 async def predict(data: dict):
     try:
         messages = data.get("messages", [])
-        user_message = next((msg["content"] for msg in messages if msg["role"] == "user"), None)
+        user_message = next((msg["content"]
+                            for msg in messages if msg["role"] == "user"), None)
         out = contract_analysis_w_fact_checking(user_message)
         if user_message:
             return {"user_content": out}
@@ -98,8 +111,6 @@ async def predict(data: dict):
                 status_code=400, detail="User message not found in input.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 @app.get("/")
