@@ -8,10 +8,12 @@ from llama_index.core.node_parser import SimpleFileNodeParser
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
 from llama_index.core import VectorStoreIndex, StorageContext
 import weaviate
+from llama_index.llms.clarifai import Clarifai
 
 load_dotenv()
 
 api_key = os.environ.get('OPENAI_API_KEY')
+os.environ["CLARIFAI_PAT"] = os.getenv("CLARIFAI_PAT")
 openai.api_key = api_key
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
@@ -54,39 +56,35 @@ def contract_analysis_w_fact_checking(text):
     quert_instance = query_weaviate(text)
     llmresponse = quert_instance.response
     #node 1
-    page1 = quert_instance.source_nodes[0].node.metadata.get('page_label', '')
-    file_name1 = quert_instance.source_nodes[0].node.metadata.get('file_name', '')
-    text1 = quert_instance.source_nodes[0].node.text
-    start_char1 = quert_instance.source_nodes[0].node.start_char_idx
-    end_char1 = quert_instance.source_nodes[0].node.end_char_idx
-    score1 = quert_instance.source_nodes[0].score
-    #node 2
-    page2 = quert_instance.source_nodes[1].node.metadata.get('page_label', '')
-    file_name2 = quert_instance.source_nodes[1].node.metadata.get('file_name', '')
-    text2 = quert_instance.source_nodes[1].node.text
-    start_char2 = quert_instance.source_nodes[1].node.start_char_idx
-    end_char2 = quert_instance.source_nodes[1].node.end_char_idx
-    score2 = quert_instance.source_nodes[1].score
+    nodes = []
+    for nexted in quert_instance.source_nodes:
+        dat = nexted.node.text
+        nodes.append(dat)
 
-    return llmresponse, page1, file_name1, text1, start_char1, end_char1, score1, page2, file_name2, text2, start_char2, end_char2, score2
+
+    return llmresponse, nodes
+
+def convert_to_readable(text_list):
+    llm_model = Clarifai(model_url="https://clarifai.com/openai/chat-completion/models/gpt-4-turbo")
+    summary = llm_model.complete(prompt=f'''
+            Please generate a concise summary of the following text into points so that user can understand easily if points neccesary generate points otherwise give simple text in summary so that user understand easily
+
+            Transcription: {text_list}
+            ''')
+    summary = (str(summary))
+    
+    return summary
 
 def main():
     st.title("Easework chat")
 
     user_message = st.text_input("Enter your text:")
     if st.button("Analyze"):
-        llmresponse, page1, file_name1, text1, start_char1, end_char1, score1, page2, file_name2, text2, start_char2, end_char2, score2 = contract_analysis_w_fact_checking(user_message)
+        llmresponse, nodes = contract_analysis_w_fact_checking(user_message)
+        readable_text = convert_to_readable(nodes)
         st.write(f"LLM Response: {llmresponse}")
-        st.subheader("Source_Node 1")
-        st.write(f"Text: {text1}")
-        st.write(f"Document Name: {file_name1}")
-        st.write(f"Page Number: {page1}")
-        st.write(f"Start Coordination: {start_char1}, End Coordination: {end_char1}, Score: {score1}")
-        st.subheader("Source Node 2")
-        st.write(f"Text: {text2}")
-        st.write(f"Document Name: {file_name2}")
-        st.write(f"Page Number: {page2}")
-        st.write(f"Start Coordination: {start_char2}, End Coordination: {end_char2}, Score: {score2}")
+        st.subheader("Realtive Answer from book")
+        st.write(f"Text: {readable_text}")
 
 if __name__ == "__main__":
     main()
